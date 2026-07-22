@@ -65,6 +65,7 @@ class MainActivity : AppCompatActivity() {
             toast("Copiado")
         }
         b.btnSave.setOnClickListener { guardar() }
+        b.btnSave.setOnLongClickListener { extraerApks(); true }
         b.btnPlay.setOnClickListener { mediaKey(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, "PLAY/PAUSA") }
         b.btnNext.setOnClickListener { mediaKey(KeyEvent.KEYCODE_MEDIA_NEXT, "NEXT") }
 
@@ -156,6 +157,35 @@ class MainActivity : AppCompatActivity() {
             } catch (e: Throwable) { /* siguiente destino */ }
         }
         toast("No se pudo guardar en ningun lado, usa COPIAR")
+    }
+
+    /**
+     * Copia las APK del fabricante a la tarjeta para poder leer su manifest.
+     * /system/app es legible sin root, asi que esto funciona tal cual.
+     */
+    private fun extraerApks() {
+        val objetivos = listOf("com.nwd.bt.music", "com.bt.bc03", "com.android.bluetooth")
+        val salida = StringBuilder("\n--- EXTRACCION DE APKS ---\n")
+        val dir = File(Environment.getExternalStorageDirectory(), "btdiag_apks")
+        try { dir.mkdirs() } catch (ig: Throwable) {}
+
+        for (pkg in objetivos) {
+            try {
+                val src = packageManager.getApplicationInfo(pkg, 0).sourceDir
+                val dst = File(dir, pkg + ".apk")
+                File(src).inputStream().use { i ->
+                    dst.outputStream().use { o -> i.copyTo(o) }
+                }
+                salida.append("OK ").append(dst.absolutePath)
+                    .append(" (").append(dst.length() / 1024).append(" KB)\n")
+            } catch (e: Throwable) {
+                salida.append("FALLO ").append(pkg).append(": ")
+                    .append(e.javaClass.simpleName).append(" / ").append(e.message).append('\n')
+            }
+        }
+        live.append(salida)
+        b.txtLive.text = live.toString()
+        toast("Extraccion terminada, mira el panel verde")
     }
 
     private fun toast(s: String) = Toast.makeText(this, s, Toast.LENGTH_LONG).show()
