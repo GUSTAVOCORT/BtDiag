@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">BT Diag</string>
+    <string name="run">Reintentar</string>
+    <string name="perm">Permiso</string>
+    <string name="save">Guardar</string>
+    <string name="copy">Copiar</string>
+    <string name="play">Play/Pausa</string>
+    <string name="next">Next</string>
+</resources>

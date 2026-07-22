@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#0A0A0C"
+    android:padding="8dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <Button android:id="@+id/btnRun"
+            android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="56dp" android:text="@string/run"
+            android:textColor="#0A0A0C" android:background="#22D3EE" />
+
+        <Button android:id="@+id/btnPerm"
+            android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="56dp" android:layout_marginStart="6dp"
+            android:text="@string/perm" android:textColor="#EAFDFF"
+            android:background="#16323A" />
+
+        <Button android:id="@+id/btnSave"
+            android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="56dp" android:layout_marginStart="6dp"
+            android:text="@string/save" android:textColor="#EAFDFF"
+            android:background="#16323A" />
+
+        <Button android:id="@+id/btnCopy"
+            android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="56dp" android:layout_marginStart="6dp"
+            android:text="@string/copy" android:textColor="#EAFDFF"
+            android:background="#16323A" />
+
+        <Button android:id="@+id/btnPlay"
+            android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="56dp" android:layout_marginStart="6dp"
+            android:text="@string/play" android:textColor="#EAFDFF"
+            android:background="#1E2A16" />
+
+        <Button android:id="@+id/btnNext"
+            android:layout_width="0dp" android:layout_weight="1"
+            android:layout_height="56dp" android:layout_marginStart="6dp"
+            android:text="@string/next" android:textColor="#EAFDFF"
+            android:background="#1E2A16" />
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="3"
+        android:layout_marginTop="8dp">
+
+        <TextView android:id="@+id/txtOut"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="11sp"
+            android:typeface="monospace"
+            android:textColor="#D8F6FF"
+            android:textIsSelectable="true" />
+    </ScrollView>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="#101318"
+        android:layout_marginTop="6dp">
+
+        <TextView android:id="@+id/txtLive"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="11sp"
+            android:typeface="monospace"
+            android:textColor="#9AE6B4"
+            android:textIsSelectable="true" />
+    </ScrollView>
+</LinearLayout>
