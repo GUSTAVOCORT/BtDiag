@@ -8,12 +8,12 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.Settings
 import android.view.KeyEvent
-import android.media.AudioManager
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -24,17 +24,16 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var b: ActivityMainBinding
     private val live = StringBuilder()
+    @Volatile private var corriendo = false
 
-    /** Escucha los broadcasts legacy de AVRCP Controller (Android 6/7). */
     private val avrcpReceiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context?, i: Intent?) {
             i ?: return
             live.append("\n[AVRCP] ").append(i.action).append('\n')
             i.extras?.keySet()?.forEach { k ->
-                live.append("   ").append(k).append(" = ")
-                    .append(i.extras?.get(k)).append('\n')
+                live.append("   ").append(k).append(" = ").append(i.extras?.get(k)).append('\n')
             }
-            b.txtLive.text = live.toString()
+            runOnUiThread { b.txtLive.text = live.toString() }
         }
     }
 
@@ -43,6 +42,12 @@ class MainActivity : AppCompatActivity() {
         b = ActivityMainBinding.inflate(layoutInflater)
         setContentView(b.root)
 
+        b.txtOut.text = "Listo.\n\n" +
+            "1. Da permiso de microfono.\n" +
+            "2. Toca PERMISO y activa BT Diag en acceso a notificaciones.\n" +
+            "3. Pone musica por Bluetooth y que este SONANDO.\n" +
+            "4. Recien ahi toca REINTENTAR."
+
         pedirPermisos()
 
         b.btnRun.setOnClickListener { correr() }
@@ -50,23 +55,21 @@ class MainActivity : AppCompatActivity() {
             try {
                 startActivity(Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS"))
             } catch (e: Throwable) {
-                try { startActivity(Intent(Settings.ACTION_SETTINGS)) } catch (_: Throwable) {}
+                try { startActivity(Intent(Settings.ACTION_SETTINGS)) } catch (ig: Throwable) {}
                 toast("Busca manualmente Acceso a notificaciones")
             }
         }
         b.btnCopy.setOnClickListener {
             val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            cm.setPrimaryClip(ClipData.newPlainText("btdiag", b.txtOut.text))
-            toast("Copiado al portapapeles")
+            cm.setPrimaryClip(ClipData.newPlainText("btdiag", texto()))
+            toast("Copiado")
         }
         b.btnSave.setOnClickListener { guardar() }
-
-        // Prueba de control remoto: manda un NEXT por tecla multimedia.
-        b.btnNext.setOnClickListener { mediaKey(KeyEvent.KEYCODE_MEDIA_NEXT) }
-        b.btnPlay.setOnClickListener { mediaKey(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) }
+        b.btnPlay.setOnClickListener { mediaKey(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, "PLAY/PAUSA") }
+        b.btnNext.setOnClickListener { mediaKey(KeyEvent.KEYCODE_MEDIA_NEXT, "NEXT") }
 
         registrarAvrcp()
-        correr()
+        // Ya NO se corre solo al arrancar: primero los permisos y la musica.
     }
 
     private fun pedirPermisos() {
@@ -74,20 +77,11 @@ class MainActivity : AppCompatActivity() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
             != PackageManager.PERMISSION_GRANTED
         ) faltan.add(Manifest.permission.RECORD_AUDIO)
-
         if (Build.VERSION.SDK_INT >= 31 &&
             ActivityCompat.checkSelfPermission(this, "android.permission.BLUETOOTH_CONNECT")
             != PackageManager.PERMISSION_GRANTED
         ) faltan.add("android.permission.BLUETOOTH_CONNECT")
-
         if (faltan.isNotEmpty()) ActivityCompat.requestPermissions(this, faltan.toTypedArray(), 1)
-    }
-
-    override fun onRequestPermissionsResult(
-        requestCode: Int, permissions: Array<out String>, grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        correr()
     }
 
     private fun registrarAvrcp() {
@@ -105,58 +99,69 @@ class MainActivity : AppCompatActivity() {
                 @Suppress("UnspecifiedRegisterReceiverFlag")
                 registerReceiver(avrcpReceiver, f)
             }
-            live.append("Receiver AVRCP registrado. Cambia de cancion en el celu.\n")
+            live.append("Receiver AVRCP registrado.\n")
         } catch (e: Throwable) {
-            live.append("No se pudo registrar receiver AVRCP: ").append(e.message).append('\n')
+            live.append("No se registro receiver: ").append(e.message).append('\n')
         }
         b.txtLive.text = live.toString()
     }
 
-    private fun mediaKey(code: Int) {
+    /** Manda la tecla y verifica si la musica cambio de estado. */
+    private fun mediaKey(code: Int, nombre: String) {
         try {
             val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            val antes = am.isMusicActive
             am.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, code))
             am.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, code))
-            toast("Tecla enviada. Mira si el celu reacciona.")
+            b.txtLive.postDelayed({
+                val despues = am.isMusicActive
+                live.append("\n[TECLA ").append(nombre).append("] musicActive antes=")
+                    .append(antes).append(" despues=").append(despues).append('\n')
+                b.txtLive.text = live.toString()
+            }, 1200)
+            toast("Tecla enviada, mira si el celu reacciona")
         } catch (e: Throwable) {
             toast("Fallo: " + e.message)
         }
     }
 
     private fun correr() {
-        b.txtOut.text = "Ejecutando pruebas..."
+        if (corriendo) { toast("Ya se esta ejecutando, espera"); return }
+        corriendo = true
+        b.txtOut.text = "Ejecutando..."
         Thread {
-            val out = try { Probe.run(this) } catch (e: Throwable) {
-                "ERROR GENERAL: " + e.javaClass.name + " / " + e.message
+            val p = Probe(applicationContext) { parcial ->
+                runOnUiThread { b.txtOut.text = parcial }
             }
-            runOnUiThread { b.txtOut.text = out }
+            try { p.run() } catch (e: Throwable) {
+                runOnUiThread { b.txtOut.append("\nERROR GENERAL: " + e.javaClass.name + " / " + e.message) }
+            } finally { corriendo = false }
         }.start()
     }
 
+    private fun texto() = b.txtOut.text.toString() + "\n\n--- PANEL EN VIVO ---\n" + live
+
     private fun guardar() {
-        try {
-            val dir = Environment.getExternalStoragePublicDirectory(
-                Environment.DIRECTORY_DOWNLOADS
-            )
-            if (!dir.exists()) dir.mkdirs()
-            val f = File(dir, "bt_diag.txt")
-            f.writeText(b.txtOut.text.toString() + "\n\n--- LIVE ---\n" + live)
-            toast("Guardado en " + f.absolutePath)
-        } catch (e: Throwable) {
+        val destinos = listOf(
+            File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "bt_diag.txt"),
+            File(Environment.getExternalStorageDirectory(), "bt_diag.txt"),
+            File(getExternalFilesDir(null), "bt_diag.txt")
+        )
+        for (f in destinos) {
             try {
-                val f = File(getExternalFilesDir(null), "bt_diag.txt")
-                f.writeText(b.txtOut.text.toString() + "\n\n--- LIVE ---\n" + live)
+                f.parentFile?.mkdirs()
+                f.writeText(texto())
                 toast("Guardado en " + f.absolutePath)
-            } catch (e2: Throwable) {
-                toast("No se pudo guardar: " + e2.message)
-            }
+                return
+            } catch (e: Throwable) { /* siguiente destino */ }
         }
+        toast("No se pudo guardar en ningun lado, usa COPIAR")
     }
 
     private fun toast(s: String) = Toast.makeText(this, s, Toast.LENGTH_LONG).show()
 
     override fun onDestroy() {
-        try { unregisterReceiver(avrcpReceiver) } catch (ignored: Throwable) {}
+        try { unregisterReceiver(avrcpReceiver) } catch (ig: Throwable) {}
         super.onDestroy()
     }
 }
